@@ -1,2 +1,2 @@
 # STAT-4355-Team-Project
-Git Repo for UTD STAT 4355 Group Project
+Our dataset can be found in this git repo
