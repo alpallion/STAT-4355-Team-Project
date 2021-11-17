@@ -3,12 +3,10 @@ library(tidyverse)
 library(reshape2)
 library(MASS)
 library(car)
-filePathtoData = "C:/Users/Alpallion/Documents/!UTD FALL 2021/STAT 4355/Group Project"
-setwd(filePathtoData)
 # url = 'https://raw.githubusercontent.com/BryantR1/CS-4372-Assignment1/main/train.csv'
-train_df = read.csv("train.csv")
+train_df = read.csv("data/train.csv")
 working_ds <- data.frame(train_df)
-test_df = read.csv("test.csv")
+test_df = read.csv("data/test.csv")
 
 #columns to drop
 # 1. get houses with all utilities: Utilities == AllPub
