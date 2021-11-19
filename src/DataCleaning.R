@@ -8,6 +8,20 @@ train_df = read.csv("data/train.csv")
 working_ds <- data.frame(train_df)
 test_df = read.csv("data/test.csv")
 
+# before altering the data lets create a correlation matrix for all the variables
+check <- which(sapply(working_ds, is.numeric))
+cor_df <- colnames(working_ds)[check]
+cor_df <- working_ds[cor_df]
+cor_df <- cor(cor_df, use = "complete.obs")
+cor_df <- data.frame(cor_df)
+
+
+# checking the top variables that are correlated with saleprice
+cor_df['SalePrice']
+
+
+
+
 #columns to drop
 # 1. get houses with all utilities: Utilities == AllPub
 # 2. Consider only residential zones: MSZoning != A, C, FV, I
