@@ -4,7 +4,10 @@ library(reshape2)
 library(MASS)
 library(car)
 
-
+source("src/ResidualPlots.R")
+source("src/DataCleaning.R")
+source("src/DataAnalysis.R")
+#source("src/testing.R")
 ## creating a linear model
 model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
                 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
@@ -36,7 +39,7 @@ ggplot(data2) +
 fit <- lm(SalePrice ~., model_ds)
 summary(fit)
 
-
+printResPlots(fit)
 # standardized residuals
 standardRes <- stdres(fit)
 print(standardRes)

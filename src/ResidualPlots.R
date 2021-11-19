@@ -1,5 +1,5 @@
 printResPlots <- function(fit) {
-  path = 'C:/Users/Bryant/OneDrive/School OneDrive/Senior Year/STAT 4355/Github Project/STAT-4355-Team-Project/plots/'
+  path = 'plots/'
   setwd(path)
   # residual plots
   # rstudent
