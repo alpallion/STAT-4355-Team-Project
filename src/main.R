@@ -4,9 +4,10 @@ library(reshape2)
 library(MASS)
 library(car)
 
-source("src/ResidualPlots.R")
+source("src/Plots.R")
 source("src/DataCleaning.R")
 source("src/DataAnalysis.R")
+source("src/influentialPoints.R")
 #source("src/testing.R")
 ## creating a linear model
 model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
@@ -36,51 +37,16 @@ ggplot(data2) +
 #model_ds[factor_drop] <- NULL
 
 # creating a linear model
-fit <- lm(SalePrice ~., model_ds)
+fit <- lm(SalePrice ~ ., data = model_ds)
+parameters <- length(fit$coefficients) - 1
+n_observations <- nrow(model_ds)
 summary(fit)
 
-printResPlots(fit)
-# standardized residuals
-standardRes <- stdres(fit)
-print(standardRes)
-range(stdres(fit))
+# calculating influential points
+influenceAnalysis(fit, n_observations)
+# printing plots
+printPlots(fit)
 
-barplot(height = stdres(fit), names.ag = 1:nrow(model_ds),
-        main = "Standardized Residuals", xlab = "Index",
-        ylab = "Standardized Resid", ylim=c(-3,3))
-#Add cutoff values. Either 2 or 3 can be chosen.
-abline(h=3, col = "Red", lwd=2)
-abline(h=-3, col = "Red", lwd=2)
-
-
-# studentized residuals
-studentRes <- studres(fit)
-print(studentRes)
-
-range(studres(fit))
-
-barplot(height = studres(fit), names.ag = 1:nrow(model_ds),
-        main = "Studentized Residuals", xlab = "Index",
-        ylab = "Studentized Resid", ylim=c(-3,3))
-
-abline(h=3, col = "Red", lwd=2)
-abline(h=-3, col = "Red", lwd=2)
-
-# R-student residuals
-rstudentRes <- rstudent(fit)
-print(rstudentRes)
-range(rstudentRes)
-
-barplot(height = rstudentRes, names.ag = 1:nrow(model_ds),
-        main = "R Student Residuals", xlab = "Index",
-        ylab = "R Student Resid", ylim=c(-4,4))
-
-corLevel <- 0.05/(2*25)
-corQt <- qt(corLevel, 21, lower.tail=F)
-rstudentRes > corQt
-
-abline(h=corQt , col = "Red", lwd=2)
-abline(h=-corQt , col = "Red", lwd=2)
 
 res_df <- data.frame(standardRes,studentRes,rstudentRes)
 
@@ -88,69 +54,25 @@ res_df <- data.frame(standardRes,studentRes,rstudentRes)
 # The residual barplot shows the residual value for each point. We can see if there are outliers if
 # some points go over the threshold that we have set
 
-#b)
-# hat values
-hat_vals <- hatvalues(fit)
-p = sum(hat_vals)
-n = nrow(data)
-hat_vals[hat_vals > ((2*p)/ n)]
-# potential influential points are 18 and 27 since they are greater than the threshold 2p/n
 
-# cooks D
-cooks_vals <- cooks.distance(fit)
-cooks_vals[cooks_vals > 1]
-# Since none of the cook's distance values are greater than 1, there is no potential influential
-# points according to the cook's distance method.
+#anova table
+m_anova <- anova(fit)
+ss_sum <- sum(m_anova[0:5,2])
+res <- m_anova[6,2]
+total <- ss_sum + res
+reg_df <- 6 - 1
+res_df <- m_anova[6,1]
+total_df <- 28 - 1
 
+msr <- ss_sum / reg_df
+mse <- res / res_df
 
-# DFBETAS
-betas_vals <- dfbetas(fit)
-abs(betas_vals) > 2 /sqrt(n)
-which(betas_vals > 2 /sqrt(n), arr.ind = TRUE)
-# point 10 is a potential influential point for beta_8
-# point 21 is a potential influential point for beta_7
-
-
-#DFFITS
-dffits_vals <- dffits(fit)
-dffits_vals[abs(dffits_vals) > 2*sqrt(p/n)]
-# Since none of the DFFITS values are greater than 2 * sqrt(4/28), there is no potential influential
-# points according to the DFFITS method.
-
-#covratio
-covr_vals <- covratio(fit)
-# check if lower bound is appropriate for this model
-n > 3*p
-covr_vals[(covr_vals < 1 - (3*p)/n) | (covr_vals > 1 + (3*p)/n)]
-
-#The points 1, 5, 11, 17, 18, 27 are considered influential by the covratio method
-
-myInf <- influence.measures(fit)
-summary(myInf)
-
-
-#ii)
-influenceIndexPlot(fit, vars = c("hat", "Cook"))
-dfbetasPlots(fit,intercept=T)
-
-# normal distribution plot
-par(mfrow=c(1,2))
-hist(studres(fit), breaks=10, freq=F, col="cornflowerblue",
-     cex.axis=1.5, cex.lab=1.5, cex.main=2)
-qqPlot(fit)
-
-
-# residual plots
-par(mfrow=c(1,1))
-# rstudent
-residualPlot(fit, type="rstudent", quadratic=F, col = "dodgerblue",
-             pch=16, cex=1.5, cex.axis=1.5, cex.lab=1.5)
-
-# standardized
-residualPlot(fit, type="rstandard", quadratic=F, col = "dodgerblue",
-             pch=16, cex=1.5, cex.axis=1.5, cex.lab=1.5)
-
-
-
+f_stat <- msr / mse
+#construct table
+ss_column <- c(ss_sum, res,total)
+df_column <- c(reg_df,res_df,total_df)
+ms_column <- c(msr,mse,NA)
+f_column <- c(f_stat, NA, NA)
+anova_t1 <- data.frame(ss_column,df_column,ms_column,f_column)
 
 

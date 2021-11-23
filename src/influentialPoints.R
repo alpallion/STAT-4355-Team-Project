@@ -1,0 +1,76 @@
+influenceAnalysis <- function(fit, n_observations) {
+  # hat values
+  hat_vals <- hatvalues(fit)
+  # p is the trace of the hat matrix, the sum of all h_ii
+  p = sum(hat_vals)
+  n = n_observations
+  hat_vals <- hat_vals[hat_vals > ((2*p)/ n)]
+  print(c('The hat values greater than 2*p/n are: ', hat_vals))
+  
+  # cooks D
+  cooks_vals <- cooks.distance(fit)
+  # Check for two cutoffs: greater than 1 means definite influential point,
+  # greater than 4/n means we should investigate these points
+  cutoff_1 <- cooks_vals[cooks_vals > 1]
+  cutoff_4n <- cooks_vals[cooks_vals > 4 / n]
+  
+  if (length(cutoff_1) > 0){
+    print(c('The values with cook\'s distance greater than 1 are: ', cutoff_1))
+  } else {
+    print('There are no cook\'s distance values greater than 1')
+  } 
+  
+  if (length(cutoff_4n) > 0){
+    print(c('The values with cook\'s distance greater than 4/n are: ', cutoff_4n))
+  } else {
+    print('There are no cook\'s distance values greater than 4/n', cutoff_1)
+  }
+  
+  ##TO-DO: Create a graph that will highlight the points classified by the conditions above
+  
+  # DFBETAS
+  betas_vals <- data.frame(dfbetas(fit))
+  # create list placeholder
+  index_holder <- 0
+  for (i in names(betas_vals)){
+    # find the points that are greater than 2 / sqrt(n)
+    condition <- abs(betas_vals[i]) > 2 /sqrt(n)
+    # save the points
+    points <- names(condition[condition == TRUE,])
+    index_holder <- c(index_holder,list(c(i,points)))
+  }
+  # remove placeholder
+  index_holder[1] <- NULL
+  
+  if (length(index_holder) > 0){
+    print(c('The points that have DFBETAS values greater than 2 / sqrt(n) are: ', index_holder))
+  } else {
+    print('There are no DFBETAS values that are greater than 2 / sqrt(n)')
+  } 
+  
+  #DFFITS
+  dffits_vals <- dffits(fit)
+  # number of predictors excluding the intercept
+  points <- names(dffits_vals[abs(dffits_vals) > 2*sqrt(parameters/n)])
+  
+  if (length(points) > 0){
+    print(c('The points that have DFFITS values greater than 2 * sqrt(p/n) are: ', points))
+  } else {
+    print('There are no DFFITS values that are greater than 2 * sqrt(p/n)')
+  } 
+  
+  #covratio
+  covr_vals <- covratio(fit)
+  upper_bound <- 1 + (3*parameters)/n
+  lower_bound <- 1 - (3*parameters)/n
+  points <- names(covr_vals[(covr_vals < lower_bound) | (covr_vals > upper_bound)])
+  
+  if (length(points) > 0){
+    print(c('The points that pass a COVRATIO boundary of 1 +- (3*p)/n are: ', points))
+  } else {
+    print('There are no points that pass a COVRATIO boundary')
+  } 
+  
+  myInf <- influence.measures(fit)
+  summary(myInf)
+}
