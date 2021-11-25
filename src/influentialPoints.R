@@ -1,9 +1,9 @@
-influenceAnalysis <- function(fit, n_observations) {
+influenceAnalysis <- function(fit) {
   # hat values
   hat_vals <- hatvalues(fit)
   # p is the trace of the hat matrix, the sum of all h_ii
   p = sum(hat_vals)
-  n = n_observations
+  n = nrow(fit$model)
   hat_vals <- hat_vals[hat_vals > ((2*p)/ n)]
   print(c('The hat values greater than 2*p/n are: ', hat_vals))
   
@@ -41,6 +41,7 @@ influenceAnalysis <- function(fit, n_observations) {
   }
   # remove placeholder
   index_holder[1] <- NULL
+  dfbetas_points <- index_holder
   
   if (length(index_holder) > 0){
     print(c('The points that have DFBETAS values greater than 2 / sqrt(n) are: ', index_holder))
@@ -51,6 +52,7 @@ influenceAnalysis <- function(fit, n_observations) {
   #DFFITS
   dffits_vals <- dffits(fit)
   # number of predictors excluding the intercept
+  parameters <- length(fit$coefficients) - 1
   points <- names(dffits_vals[abs(dffits_vals) > 2*sqrt(parameters/n)])
   
   if (length(points) > 0){
@@ -71,6 +73,26 @@ influenceAnalysis <- function(fit, n_observations) {
     print('There are no points that pass a COVRATIO boundary')
   } 
   
-  myInf <- influence.measures(fit)
-  summary(myInf)
+}
+
+
+### testing returning the values of the dfbetas analysis
+
+# DFBETAS
+dfbetasPoints <- function(fit){
+  betas_vals <- data.frame(dfbetas(fit))
+  # create list placeholder
+  index_holder <- 0
+  for (i in names(betas_vals)){
+    # find the points that are greater than 2 / sqrt(n)
+    condition <- abs(betas_vals[i]) > 2 /sqrt(n)
+    # save the points
+    points <- names(condition[condition == TRUE,])
+    index_holder <- c(index_holder,list(c(i,points)))
+  }
+  # remove placeholder
+  index_holder[1] <- NULL
+  dfbetas_points <- index_holder
+  
+  return(dfbetas_points)
 }

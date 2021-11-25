@@ -3,21 +3,27 @@ library(tidyverse)
 library(reshape2)
 library(MASS)
 library(car)
+library(fastDummies)
+
 
 source("src/Plots.R")
 source("src/DataCleaning.R")
 source("src/DataAnalysis.R")
 source("src/influentialPoints.R")
 #source("src/testing.R")
-## creating a linear model
-model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
+### creating a linear model
+## these attributes contain the second floor square footage, we will remove this temporarily
+#model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
+#                'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
+model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
                 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
+
 factor_drop <- c('BsmtFullBath', 'BsmtHalfBath', 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars')
 
 model_ds <- data.frame(working_ds[model_attr])
 
 # plotting relationship between variables
-data2 <- melt(model_ds[,1:15], id.vars = 'SalePrice')
+data2 <- melt(model_ds[,1:length(model_ds)], id.vars = 'SalePrice')
 
 ggplot(data2) +
   geom_jitter(aes(value,SalePrice, colour=variable),) +
@@ -36,14 +42,49 @@ ggplot(data2) +
 # removing the discrete attribute columns
 #model_ds[factor_drop] <- NULL
 
+###creating dummy variables based on our model_ds
+dummyCols <- c('BsmtFullBath', 'BsmtHalfBath', 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars')
+dummy_df <- dummy_cols(model_ds, select_columns = dummyCols, remove_selected_columns = TRUE)
+dummyModel <- lm(SalePrice ~ ., data = dummy_df)
+summary(dummyModel)
+###
+
 # creating a linear model
 fit <- lm(SalePrice ~ ., data = model_ds)
-parameters <- length(fit$coefficients) - 1
-n_observations <- nrow(model_ds)
 summary(fit)
 
 # calculating influential points
-influenceAnalysis(fit, n_observations)
+influenceAnalysis(dummyModel)
+
+
+dfbetas_points <- dfbetasPoints(fit)
+###printing plots of influential points labeled by dfbetas,
+#this function works best with models that do not have factors
+influentialPointsPlots <- function(dfbetas_points, df) {
+
+  for (i in (2:length(dfbetas_points))) {
+    attribute <- dfbetas_points[[i]][1]
+    observations <- dfbetas_points[[i]][2:length(dfbetas_points[[i]])]
+    observations <- as.integer(observations)
+    highlight_df <- df[rownames(df) %in% observations,]
+    
+    # creating a plot with all the observations of the df and highlighting the
+    # observations found by the dfbetas test
+    p <- ggplot() + 
+      geom_point(aes(x = df[[attribute]], y = df$SalePrice)) +
+      geom_point(aes(x = highlight_df[[attribute]], y = highlight_df$SalePrice,  color= 'Inf. Pts'), size=2) +
+      labs(x = attribute, y = 'SalePrice')
+    
+    print(p)
+  }
+  
+  
+}
+
+influentialPointsPlots(dfbetas_points, dummy_df)
+
+
+###
 # printing plots
 printPlots(fit)
 
@@ -57,7 +98,7 @@ res_df <- data.frame(standardRes,studentRes,rstudentRes)
 
 #anova table
 m_anova <- anova(fit)
-ss_sum <- sum(m_anova[0:5,2])
+  ss_sum <- sum(m_anova[0:5,2])
 res <- m_anova[6,2]
 total <- ss_sum + res
 reg_df <- 6 - 1
