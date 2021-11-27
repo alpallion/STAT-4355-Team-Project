@@ -47,7 +47,36 @@ sortCor <- function(df) {
 # all of the variables sorted in descending order with their respective variables.
 cor_df <- sortCor(cor_df)
 
+## We will create a model based on the first 9 attributes of the
+## sale price column of the sorted correlation matrix
 
+model_1_df <- cor_df[,((ncol(cor_df) - 1):ncol(cor_df))]
+model_1_attr <- model_1_df[[1]][1:10]
+#columns to drop
+# 1. get houses with all utilities: Utilities == AllPub
+# 2. Consider only residential zones: MSZoning != A, C, FV, I
+# Consider different  MSSubclass: Start with 1 story all ages, 1 story w/finished attic all ages,
+#     : MSSubClass == 20, 30, 40
+# 3. check condition1 and condition2, optimally we would want all houses to have 'normal' conditions
+#     as a nearby railroad or park may affect the price
+# 4. Consider GarageFinish as Finished only
+# 5. consider only normal house sales: SaleCondition == Normal
+drop_cols <- c('Street', 'Alley', 'KitchenAbvGr', 'KitchenQual')
+drop_basement <- c('BsmtQual', 'BsmtCond', 'BsmtExposure', 'BsmtFinType1', 'BsmtFinSF1', 'BsmtFinType2', 'BsmtFinSF2', 'BsmtUnfSF')
+drop_cols <- c(drop_cols, drop_basement)
+drop_zones <- c('A','C (all)', 'FV', 'I')
+keep_subclass <- c(20, 30, 40)
+working_ds[drop_cols] <- NULL
+working_ds <- working_ds[working_ds['Utilities'] == 'AllPub', ]
+working_ds <- working_ds[!(working_ds$MSZoning %in% drop_zones), ]
+working_ds <- working_ds[(working_ds$MSSubClass %in% keep_subclass), ]
+working_ds <- working_ds[(working_ds['SaleCondition'] == 'Normal'),]
+
+model_1_df <- data.frame(working_ds[model_1_attr])
+
+
+# Next we will create a model based on attributes that make sense logically
+working_ds <- data.frame(train_ds)
 #columns to drop
 # 1. get houses with all utilities: Utilities == AllPub
 # 2. Consider only residential zones: MSZoning != A, C, FV, I
@@ -69,3 +98,12 @@ working_ds <- working_ds[!(working_ds$MSZoning %in% drop_zones), ]
 working_ds <- working_ds[(working_ds$MSSubClass %in% keep_subclass), ]
 working_ds <- working_ds[(working_ds['SaleCondition'] == 'Normal'),]
 
+## these attributes contain the second floor square footage, we will remove this temporarily
+#model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
+#                'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
+
+
+model_2_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
+                'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
+
+model_2_df <- data.frame(working_ds[model_2_attr])

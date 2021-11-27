@@ -5,115 +5,153 @@ library(MASS)
 library(car)
 library(fastDummies)
 
-
 source("src/Plots.R")
 source("src/DataCleaning.R")
 source("src/DataAnalysis.R")
 source("src/influentialPoints.R")
 #source("src/testing.R")
-### creating a linear model
-## these attributes contain the second floor square footage, we will remove this temporarily
-#model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'X2ndFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
-#                'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
-model_attr <- c('LotArea', 'YearBuilt', 'TotalBsmtSF', 'X1stFlrSF', 'GrLivArea', 'BsmtFullBath', 'BsmtHalfBath',
-                'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars', 'GarageArea', 'SalePrice')
 
-factor_drop <- c('BsmtFullBath', 'BsmtHalfBath', 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars')
-
-model_ds <- data.frame(working_ds[model_attr])
-
+### Model 1
 # plotting relationship between variables
-data2 <- melt(model_ds[,1:length(model_ds)], id.vars = 'SalePrice')
+plotRelationship(model_1_df)
+# show the potential outliers in the model before creating dummy variables
+model_1_lm <- lm(SalePrice ~ ., data = model_1_df)
+summary(model_1_lm)
+# store the DFBETAS points
+dfbetas_model_1_lm <- dfbetasPoints(model_1_lm)
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_1_lm, model_1_df)
 
-ggplot(data2) +
-  geom_jitter(aes(value,SalePrice, colour=variable),) +
-  geom_smooth(aes(value,SalePrice, colour=variable), method=lm, se=FALSE) +
-  facet_wrap(~variable, scales="free_x")
+## On the relationship plot, we can see we need to convert some variables into factors to get an accurate linear model
+# get the name of the columns that we want to convert to factors
+dummy_vars <- c('OverallQual', 'GarageCars', 'FullBath', 'TotRmsAbvGrd')
+dummy_df_1 <- dummy_cols(model_1_df, select_columns = dummy_vars, remove_selected_columns = TRUE)
 
-# converting discrete attributes into factors
-#model_ds$bsmtFullBathFactor <- factor(model_ds$BsmtFullBath)
-#model_ds$bsmtHalfBathFactor <- factor(model_ds$BsmtHalfBath)
-#model_ds$fullBathFactor <- factor(model_ds$FullBath)
-#model_ds$halfBathFactor <- factor(model_ds$HalfBath)
-#model_ds$bedroomFactor <- factor(model_ds$BedroomAbvGr)
-#model_ds$fireplacesFactor <- factor(model_ds$Fireplaces)
-#model_ds$carsFactor <- factor(model_ds$GarageCars)
+# create a linear model using the new dataframe 
+dummy_model_1 <- lm(SalePrice ~ ., data = dummy_df_1)
+summary(dummy_model_1)
+#check for vif values
+#vif(dummy_model_1)
+## we can see that we cannot calculate the VIFs because some of the variables are linearly dependent
+## we will remove these variables and create a new linear model
+colinearity_attr <- attributes(alias(dummy_model_1)$Complete)$dimnames[[1]]
+dummy_df_1 <- dummy_df_1[!(names(dummy_df_1) %in% colinearity_attr)]
+# creating a new linear model without the variables that were linearly dependent
+dummy_model_1 <- lm(SalePrice ~ ., data = dummy_df_1)
+summary(dummy_model_1)
+# check the vif values
+vif(dummy_model_1)
+## now that we can calculate the vif values we will plot them to see which ones are significant
+## A guideline is if the VIF value is greater than 5 it is of concern, if it is greater than 10 is is problematic
+model_1_vifs <- data.frame(vif(dummy_model_1))
+model_1_vifs$variables <- rownames(model_1_vifs)
+names(model_1_vifs) <- c('vif', 'variable')
 
-# removing the discrete attribute columns
-#model_ds[factor_drop] <- NULL
-
-###creating dummy variables based on our model_ds
-dummyCols <- c('BsmtFullBath', 'BsmtHalfBath', 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars')
-dummy_df <- dummy_cols(model_ds, select_columns = dummyCols, remove_selected_columns = TRUE)
-dummyModel <- lm(SalePrice ~ ., data = dummy_df)
-summary(dummyModel)
-###
-
-# creating a linear model
-fit <- lm(SalePrice ~ ., data = model_ds)
-summary(fit)
+ggplot(model_1_vifs) +
+  geom_bar(aes(x = variable, y = vif, fill = variable), stat = "identity") +
+  geom_text(aes(x = variable, y=vif, label = sprintf("%.1f", vif)), vjust=0) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1))
 
 # calculating influential points
-influenceAnalysis(dummyModel)
+influenceAnalysis(dummy_model_1)
+
+# store the DFBETAS points
+dfbetas_model_1 <- dfbetasPoints(dummy_model_1)
+
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_1, dummy_df_1)
+
+# printing residual plots
+printPlots(dummy_model_1)
+## From the residual plots we can see that there is a slight cone shape.
+## We will use a square root transformation
+# make a copy of the dataframe from our initial model
+dummy_df_1_transform <- data.frame(dummy_df_1)
+# take the square root of the response variable, in this case SalePrice
+dummy_df_1_transform$SalePrice <- sqrt(dummy_df_1_transform$SalePrice)
+dummy_model_1_transform <- lm(SalePrice ~ ., data = dummy_df_1_transform)
+summary(dummy_model_1_transform)
+## once again create new plots for the transformed model
+# store the DFBETAS points
+dfbetas_model_1_transform <- dfbetasPoints(dummy_model_1_transform)
+
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_1_transform, dummy_df_1_transform)
+
+# printing residual plots
+printPlots(dummy_model_1_transform)
 
 
-dfbetas_points <- dfbetasPoints(fit)
-###printing plots of influential points labeled by dfbetas,
-#this function works best with models that do not have factors
-influentialPointsPlots <- function(dfbetas_points, df) {
-
-  for (i in (2:length(dfbetas_points))) {
-    attribute <- dfbetas_points[[i]][1]
-    observations <- dfbetas_points[[i]][2:length(dfbetas_points[[i]])]
-    observations <- as.integer(observations)
-    highlight_df <- df[rownames(df) %in% observations,]
-    
-    # creating a plot with all the observations of the df and highlighting the
-    # observations found by the dfbetas test
-    p <- ggplot() + 
-      geom_point(aes(x = df[[attribute]], y = df$SalePrice)) +
-      geom_point(aes(x = highlight_df[[attribute]], y = highlight_df$SalePrice,  color= 'Inf. Pts'), size=2) +
-      labs(x = attribute, y = 'SalePrice')
-    
-    print(p)
-  }
-  
-  
-}
-
-influentialPointsPlots(dfbetas_points, dummy_df)
 
 
-###
-# printing plots
-printPlots(fit)
+### Model 2
+# plotting relationship between variables
+plotRelationship(model_2_df)
+# show the potential outliers in the model before creating dummy variables
+model_2_lm <- lm(SalePrice ~ ., data = model_2_df)
+summary(model_2_lm)
+# store the DFBETAS points
+dfbetas_model_2_lm <- dfbetasPoints(model_2_lm)
 
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_2_lm, model_2_df)
 
-res_df <- data.frame(standardRes,studentRes,rstudentRes)
+## On the relationship plot, we can see we need to convert some variables into factors to get an accurate linear model
+# get the name of the columns that we want to convert to factors
+dummy_vars <- c('BsmtFullBath', 'BsmtHalfBath', 'FullBath', 'HalfBath', 'BedroomAbvGr', 'Fireplaces', 'GarageCars')
+dummy_df_2 <- dummy_cols(model_2_df, select_columns = dummy_vars, remove_selected_columns = TRUE)
 
-#iii)
-# The residual barplot shows the residual value for each point. We can see if there are outliers if
-# some points go over the threshold that we have set
+# create a linear model using the new dataframe 
+dummy_model_2 <- lm(SalePrice ~ ., data = dummy_df_2)
+summary(dummy_model_2)
+#check for vif values
+vif(dummy_model_2)
+## we can see that we cannot calculate the VIFs because some of the variables are linearly dependent
+## we will remove these variables and create a new linear model
+colinearity_attr <- attributes(alias(dummy_model_2)$Complete)$dimnames[[1]]
+dummy_df_2 <- dummy_df_2[!(names(dummy_df_2) %in% colinearity_attr)]
+# creating a new linear model without the variables that were linearly dependent
+dummy_model_2 <- lm(SalePrice ~ ., data = dummy_df_2)
+summary(dummy_model_2)
+# check the vif values
+vif(dummy_model_2)
+## now that we can calculate the vif values we will plot them to see which ones are significant
+## A guideline is if the VIF value is greater than 5 it is of concern, if it is greater than 10 is is problematic
+model_2_vifs <- data.frame(vif(dummy_model_2))
+model_2_vifs$variables <- rownames(model_2_vifs)
+names(model_2_vifs) <- c('vif', 'variable')
 
+ggplot(model_2_vifs) +
+  geom_bar(aes(x = variable, y = vif, fill = variable), stat = "identity") +
+  geom_text(aes(x = variable, y=vif, label = sprintf("%.1f", vif)), vjust=0) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0, hjust=1))
 
-#anova table
-m_anova <- anova(fit)
-  ss_sum <- sum(m_anova[0:5,2])
-res <- m_anova[6,2]
-total <- ss_sum + res
-reg_df <- 6 - 1
-res_df <- m_anova[6,1]
-total_df <- 28 - 1
+# calculating influential points
+influenceAnalysis(dummy_model_2)
 
-msr <- ss_sum / reg_df
-mse <- res / res_df
+# store the DFBETAS points
+dfbetas_model_2 <- dfbetasPoints(dummy_model_2)
 
-f_stat <- msr / mse
-#construct table
-ss_column <- c(ss_sum, res,total)
-df_column <- c(reg_df,res_df,total_df)
-ms_column <- c(msr,mse,NA)
-f_column <- c(f_stat, NA, NA)
-anova_t1 <- data.frame(ss_column,df_column,ms_column,f_column)
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_2, dummy_df_2)
 
+# printing residual plots
+printPlots(dummy_model_2)
+## From the residual plots we can see that there is a slight cone shape.
+## We will use a square root transformation
+# make a copy of the dataframe from our initial model
+dummy_df_2_transform <- data.frame(dummy_df_2)
+# take the square root of the response variable, in this case SalePrice
+dummy_df_2_transform$SalePrice <- sqrt(dummy_df_2_transform$SalePrice)
+dummy_model_2_transform <- lm(SalePrice ~ ., data = dummy_df_2_transform)
+summary(dummy_model_2_transform)
+## once again create new plots for the transformed model
+# store the DFBETAS points
+dfbetas_model_2_transform <- dfbetasPoints(dummy_model_2_transform)
+
+# Plot the influential points
+influentialPointsPlots(dfbetas_model_2_transform, dummy_df_2_transform)
+
+# printing residual plots
+printPlots(dummy_model_2_transform)
 

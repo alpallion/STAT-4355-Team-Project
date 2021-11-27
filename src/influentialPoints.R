@@ -78,8 +78,10 @@ influenceAnalysis <- function(fit) {
 
 ### testing returning the values of the dfbetas analysis
 
-# DFBETAS
+##This function calculates and returns the DFBETAS points for all the attributes used in the linear model
+## The function takes in a linear model object
 dfbetasPoints <- function(fit){
+  n = nrow(fit$model)
   betas_vals <- data.frame(dfbetas(fit))
   # create list placeholder
   index_holder <- 0
@@ -88,11 +90,36 @@ dfbetasPoints <- function(fit){
     condition <- abs(betas_vals[i]) > 2 /sqrt(n)
     # save the points
     points <- names(condition[condition == TRUE,])
-    index_holder <- c(index_holder,list(c(i,points)))
+    # check if there are any DFBETAS values
+    if (!is.null(points)){
+      index_holder <- c(index_holder,list(c(i,points)))
+    }
   }
   # remove placeholder
   index_holder[1] <- NULL
   dfbetas_points <- index_holder
   
   return(dfbetas_points)
+}
+
+###This function takes the points calculated by the dfbetasPoints function to create plots
+## with the potential influential points highlighted
+## This function takes in the dfbetas points and the dataframe used to create the linear model.
+# this function works best with models that do not have factors
+influentialPointsPlots <- function(dfbetas_points, df) {
+  for (i in (2:length(dfbetas_points))) {
+    attribute <- dfbetas_points[[i]][1]
+    observations <- dfbetas_points[[i]][2:length(dfbetas_points[[i]])]
+    observations <- as.integer(observations)
+    highlight_df <- df[rownames(df) %in% observations,]
+    
+    # creating a plot with all the observations of the df and highlighting the
+    # observations found by the dfbetas test
+    p <- ggplot() + 
+      geom_point(aes(x = df[[attribute]], y = df$SalePrice)) +
+      geom_point(aes(x = highlight_df[[attribute]], y = highlight_df$SalePrice,  color= 'Inf. Pts'), size=2) +
+      labs(x = attribute, y = 'SalePrice')
+    
+    print(p)
+  }
 }
